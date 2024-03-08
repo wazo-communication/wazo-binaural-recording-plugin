@@ -11,18 +11,18 @@ case "$1" in
         ;;
     install)
 	echo "Applying patches"
-        patch --verbose -p1 -d /usr/share/xivo-config < /usr/share/wazo-binauralrecording-patch//xivo-config.patch
-        patch --verbose -p1 -d /usr/lib/python3/dist-packages < /usr/share/wazo-binauralrecording-patch//wazo-agid.patch
-        patch --verbose -p1 -d /usr/lib/python3/dist-packages < /usr/share/wazo-binauralrecording-patch//wazo-calld.patch
+        patch --verbose --reject-file - -p1 -d /usr/share/xivo-config < /usr/share/wazo-binauralrecording-patch//xivo-config.patch
+        patch --verbose --reject-file - -p1 -d /usr/lib/python3/dist-packages < /usr/share/wazo-binauralrecording-patch//wazo-agid.patch
+        patch --verbose --reject-file - -p1 -d /usr/lib/python3/dist-packages < /usr/share/wazo-binauralrecording-patch//wazo-calld.patch
         wazo-service restart wazo-calld wazo-agid
         asterisk -x 'dialplan reload'
         ;;
     uninstall)
-        patch --verbose -p1 -R -d /usr/share/xivo-config < /usr/share/wazo-binauralrecording-patch/xivo-config.patch
-        patch --verbose -p1 -R -d /usr/lib/python3/dist-packages < /usr/share/wazo-binauralrecording-patch/wazo-agid.patch
-        patch --verbose -p1 -R -d /usr/lib/python3/dist-packages < /usr/share/wazo-binauralrecording-patch/wazo-calld.patch
-        wazo-service restart wazo-calld wazo-agid
-        asterisk -x 'dialplan reload'
+        patch --verbose -p1 -R -d /usr/share/xivo-config < /usr/share/wazo-binauralrecording-patch/xivo-config.patch || true;
+        patch --verbose -p1 -R -d /usr/lib/python3/dist-packages < /usr/share/wazo-binauralrecording-patch/wazo-agid.patch || true;
+        patch --verbose -p1 -R -d /usr/lib/python3/dist-packages < /usr/share/wazo-binauralrecording-patch/wazo-calld.patch || true;
+        wazo-service restart wazo-calld wazo-agid;
+        asterisk -x 'dialplan reload';
         ;;
     postrm)
         ;;
