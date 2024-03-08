@@ -1,0 +1,5 @@
+namespace: wazo
+name: binauralrecording
+description: configure recordings with caller and callee in separate audio channels(left and right) for users and call center queues
+version: 0.0.1
+plugin_format_version: 1

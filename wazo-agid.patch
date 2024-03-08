@@ -1,0 +1,175 @@
+diff --git a/wazo_agid/handlers/queue.py b/wazo_agid/handlers/queue.py
+index c807fde..4b77366 100644
+--- a/wazo_agid/handlers/queue.py
++++ b/wazo_agid/handlers/queue.py
+@@ -1,4 +1,4 @@
+-# Copyright 2021-2023 The Wazo Authors  (see the AUTHORS file)
++# Copyright 2021-2024 The Wazo Authors  (see the AUTHORS file)
+ # SPDX-License-Identifier: GPL-3.0-or-later
+ from __future__ import annotations
+ 
+@@ -14,6 +14,8 @@ AGENT_CHANNEL_RE = re.compile(r'^Local/id-(\d+)@agentcallback-[a-f0-9]+;1$')
+ 
+ 
+ class AnswerHandler(handler.Handler):
++    destination_agent_id: str | None = None
++
+     def execute(self):
+         try:
+             callee = self.get_user()
+@@ -31,6 +33,7 @@ class AnswerHandler(handler.Handler):
+         if result:
+             agent_id = result.group(1)
+             search_params = {'agent_id': int(agent_id)}
++            self.destination_agent_id = agent_id
+         else:
+             user_uuid = self._agi.get_variable('WAZO_USERUUID')
+             if user_uuid:
+@@ -46,20 +49,39 @@ class AnswerHandler(handler.Handler):
+         if recording_is_on:
+             return
+ 
++        queue_recording = self._agi.get_variable('WAZO_QUEUE_RECORDING')
+         external = self._agi.get_variable('WAZO_CALLORIGIN') == 'extern'
+         internal = not external
+         should_record = any(
+             [
+                 internal and callee.call_record_incoming_internal_enabled,
+                 external and callee.call_record_incoming_external_enabled,
++                self.destination_agent_id and queue_recording,
+             ]
+         )
+         if not should_record:
++            self._agi.verbose(
++                (
++                    'Call recording is not enabled for call of type "{}" '
++                    'for callee "{}"(uuid={})'
++                ).format(
++                    "external" if external else "internal",
++                    " ".join([callee.firstname, callee.lastname]),
++                    callee.uuid,
++                )
++            )
+             return
+ 
+         calld = self._agi.config['calld']['client']
+         channel_id = self._agi.env['agi_uniqueid']
++
+         try:
++            self._agi.verbose(
++                'Initiating call recording for callee "{}"(uuid={})'.format(
++                    " ".join([callee.firstname, callee.lastname]),
++                    callee.uuid,
++                )
++            )
+             calld.calls.start_record(channel_id)
+         except Exception as e:
+             logger.error('Error during enabling call recording: %s', e)
+diff --git a/wazo_agid/modules/call_recording.py b/wazo_agid/modules/call_recording.py
+index 1fcc918..ca1e99e 100644
+--- a/wazo_agid/modules/call_recording.py
++++ b/wazo_agid/modules/call_recording.py
+@@ -1,10 +1,10 @@
+-# Copyright 2020-2023 The Wazo Authors  (see the AUTHORS file)
++# Copyright 2020-2024 The Wazo Authors  (see the AUTHORS file)
+ # SPDX-License-Identifier: GPL-3.0-or-later
+ from __future__ import annotations
+ 
+ import logging
+ import uuid
+-from typing import TYPE_CHECKING
++from typing import TYPE_CHECKING, Any
+ 
+ from wazo_agid import agid, dialplan_variables, objects
+ 
+@@ -20,6 +20,14 @@ CALL_RECORDING_FILENAME_TEMPLATE = (
+     '/var/lib/wazo/sounds/tenants/{tenant_uuid}/monitor/{recording_uuid}.wav'
+ )
+ 
++CALL_RECORDING_FILENAME_TEMPLATE_A = (
++    '/var/lib/wazo/sounds/tenants/{tenant_uuid}/monitor/{recording_uuid}-a.wav'
++)
++
++CALL_RECORDING_FILENAME_TEMPLATE_B = (
++    '/var/lib/wazo/sounds/tenants/{tenant_uuid}/monitor/{recording_uuid}-b.wav'
++)
++
+ 
+ def call_recording(agi: FastAGI, cursor: DictCursor, args: list[str]) -> None:
+     calld = agi.config['calld']['client']
+@@ -30,6 +38,51 @@ def call_recording(agi: FastAGI, cursor: DictCursor, args: list[str]) -> None:
+         _enable_call_recording(agi, calld, channel_id)
+ 
+ 
++BINAURAL_MIXMONITOR_COMMAND = (
++    '/usr/bin/sox -M -v 1 {filename_a} -v 1 {filename_b} {filename} '
++    '&& rm {filename_a} {filename_b}'
++)
++BINAURAL_MIXMONITOR_OPTIONS = 'r({filename_a})t({filename_b})'
++
++
++def _get_mixmonitor_args(agi: FastAGI, *args: list[Any]) -> tuple[str, str, str]:
++    tenant_uuid = agi.get_variable(dialplan_variables.TENANT_UUID)
++    recording_uuid = str(uuid.uuid4())
++    filename = CALL_RECORDING_FILENAME_TEMPLATE.format(
++        tenant_uuid=tenant_uuid,
++        recording_uuid=recording_uuid,
++    )
++    filename_a = CALL_RECORDING_FILENAME_TEMPLATE_A.format(
++        tenant_uuid=tenant_uuid,
++        recording_uuid=recording_uuid,
++    )
++    filename_b = CALL_RECORDING_FILENAME_TEMPLATE_B.format(
++        tenant_uuid=tenant_uuid,
++        recording_uuid=recording_uuid,
++    )
++    mix_monitor_options = agi.get_variable('WAZO_MIXMONITOR_OPTIONS')
++
++    binaural_options = BINAURAL_MIXMONITOR_OPTIONS.format(
++        filename_a=filename_a,
++        filename_b=filename_b,
++    )
++    mixmonitor_command = BINAURAL_MIXMONITOR_COMMAND.format(
++        filename=filename,
++        filename_a=filename_a,
++        filename_b=filename_b,
++    )
++    new_mixmonitor_options = f'{mix_monitor_options}{binaural_options}'
++    return filename, new_mixmonitor_options, mixmonitor_command
++
++
++def setup_binaural_mixmonitor(
++    agi: FastAGI, cursor: DictCursor, args: list[str]
++) -> None:
++    filename, mixmonitor_options, mixmonitor_command = _get_mixmonitor_args(agi)
++    agi.set_variable('__WAZO_MIXMONITOR_OPTIONS', mixmonitor_options)
++    agi.set_variable('__WAZO_MIXMONITOR_COMMAND', mixmonitor_command)
++
++
+ def record_caller(agi: FastAGI, cursor: DictCursor, args: list[str]) -> None:
+     is_being_recorded = agi.get_variable('WAZO_CALL_RECORD_ACTIVE') == '1'
+     if is_being_recorded:
+@@ -78,18 +131,15 @@ def start_mix_monitor(agi, cursor, args):
+ 
+ 
+ def _start_mix_monitor(agi):
+-    tenant_uuid = agi.get_variable(dialplan_variables.TENANT_UUID)
+-    recording_uuid = str(uuid.uuid4())
+-    filename = CALL_RECORDING_FILENAME_TEMPLATE.format(
+-        tenant_uuid=tenant_uuid,
+-        recording_uuid=recording_uuid,
++    filename, mixmonitor_options, mixmonitor_command = _get_mixmonitor_args(agi)
++    agi.appexec(
++        'MixMonitor',
++        f'{filename},{mixmonitor_options},{mixmonitor_command}',
+     )
+-    mix_monitor_options = agi.get_variable('WAZO_MIXMONITOR_OPTIONS')
+-
+-    agi.appexec('MixMonitor', f'{filename},{mix_monitor_options}')
+     agi.set_variable('WAZO_CALL_RECORD_ACTIVE', '1')
+ 
+ 
+ agid.register(call_recording)
+ agid.register(record_caller)
+ agid.register(start_mix_monitor)
++agid.register(setup_binaural_mixmonitor)
