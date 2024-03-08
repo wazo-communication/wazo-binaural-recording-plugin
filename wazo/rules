@@ -10,18 +10,19 @@ case "$1" in
         cp xivo-config.patch ${pkgdir}/usr/share/wazo-binauralrecording-patch/
         ;;
     install)
-	echo "Applying patches"
+        echo "Applying patches"
         patch --verbose --reject-file - -p1 -d /usr/share/xivo-config < /usr/share/wazo-binauralrecording-patch//xivo-config.patch
         patch --verbose --reject-file - -p1 -d /usr/lib/python3/dist-packages < /usr/share/wazo-binauralrecording-patch//wazo-agid.patch
         patch --verbose --reject-file - -p1 -d /usr/lib/python3/dist-packages < /usr/share/wazo-binauralrecording-patch//wazo-calld.patch
-        wazo-service restart wazo-calld wazo-agid
+        echo "Restarting patched services"
+        systemctl restart wazo-calld wazo-agid
         asterisk -x 'dialplan reload'
         ;;
     uninstall)
         patch --verbose -p1 -R -d /usr/share/xivo-config < /usr/share/wazo-binauralrecording-patch/xivo-config.patch || true;
         patch --verbose -p1 -R -d /usr/lib/python3/dist-packages < /usr/share/wazo-binauralrecording-patch/wazo-agid.patch || true;
         patch --verbose -p1 -R -d /usr/lib/python3/dist-packages < /usr/share/wazo-binauralrecording-patch/wazo-calld.patch || true;
-        wazo-service restart wazo-calld wazo-agid;
+        systemctl restart wazo-calld wazo-agid;
         asterisk -x 'dialplan reload';
         ;;
     postrm)
