@@ -3,8 +3,8 @@ index a05d8787..06083ee1 100644
 --- a/wazo_calld/plugin_helpers/ami.py
 +++ b/wazo_calld/plugin_helpers/ami.py
 @@ -1,5 +1,6 @@
--# Copyright 2016-2023 The Wazo Authors  (see the AUTHORS file)
-+# Copyright 2016-2024 The Wazo Authors  (see the AUTHORS file)
+-# Copyright 2016-2024 The Wazo Authors  (see the AUTHORS file)
++# Copyright 2016-2025 The Wazo Authors  (see the AUTHORS file)
  # SPDX-License-Identifier: GPL-3.0-or-later
 +from __future__ import annotations
  
