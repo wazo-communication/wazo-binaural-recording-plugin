@@ -1,27 +1,13 @@
 diff --git a/wazo_calld/plugin_helpers/ami.py b/wazo_calld/plugin_helpers/ami.py
-index a05d8787..06083ee1 100644
+index ca4795b7..52fc6ce6 100644
 --- a/wazo_calld/plugin_helpers/ami.py
 +++ b/wazo_calld/plugin_helpers/ami.py
-@@ -1,5 +1,6 @@
--# Copyright 2016-2024 The Wazo Authors  (see the AUTHORS file)
-+# Copyright 2016-2025 The Wazo Authors  (see the AUTHORS file)
- # SPDX-License-Identifier: GPL-3.0-or-later
-+from __future__ import annotations
- 
- import logging
- import re
-@@ -123,13 +124,21 @@ def dtmf(amid, channel, digit):
+@@ -123,13 +123,15 @@ def dtmf(amid, channel, digit):
          raise WazoAmidError(amid, e)
  
  
 -def record_start(amid, channel, filename, options=None):
-+def record_start(
-+    amid,
-+    channel: str,
-+    filename: str,
-+    options: str | None = None,
-+    command: str | None = None,
-+):
++def record_start(amid, channel, filename, options=None, command=None):
      destination = {
          'Channel': channel,
          'File': filename,
@@ -34,10 +20,10 @@ index a05d8787..06083ee1 100644
          amid.action('MixMonitor', destination)
      except RequestException as e:
 diff --git a/wazo_calld/plugins/calls/services.py b/wazo_calld/plugins/calls/services.py
-index 2643e472..b54392df 100644
+index b2a43df4..d908c168 100644
 --- a/wazo_calld/plugins/calls/services.py
 +++ b/wazo_calld/plugins/calls/services.py
-@@ -595,13 +595,40 @@ class CallsService:
+@@ -751,13 +751,40 @@ class CallsService:
          )
  
          try:
@@ -80,5 +66,5 @@ index 2643e472..b54392df 100644
 +            command=mixmonitor_command,
 +        )
  
-     def record_start_user(self, call_id, user_uuid):
+     def record_start_user(self, tenant_uuid, call_id, user_uuid):
          self._verify_user(call_id, user_uuid)
