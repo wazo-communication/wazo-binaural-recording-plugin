@@ -93,7 +93,7 @@ index 4dbb309..16df094 100644
 +
 +
 +def _get_mixmonitor_args(agi: FastAGI, *args: list[Any]) -> tuple[str, str, str]:
-+    tenant_uuid = agi.get_variable(dialplan_variables.TENANT_UUID)
++    tenant_uuid = agi.get_variable(dv.TENANT_UUID)
 +    recording_uuid = str(uuid.uuid4())
 +    filename = CALL_RECORDING_FILENAME_TEMPLATE.format(
 +        tenant_uuid=tenant_uuid,
